@@ -111,6 +111,7 @@ export function CanvasBoard() {
 
       <div
         ref={wrapperRef}
+        data-canvas-wrapper="true"
         style={{
           transformOrigin: 'center center',
           boxShadow: 'var(--shadow-canvas)',
