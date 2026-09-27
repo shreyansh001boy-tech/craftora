@@ -8,23 +8,20 @@ export function CanvasBoard() {
   const canvasEl = useRef<HTMLCanvasElement>(null)
   const wrapperRef = useRef<HTMLDivElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
-  const { canvasSize, setFabricCanvas, setActiveObjectId, syncLayersFromCanvas, pushHistory, fabricCanvas } = useEditorStore()
+  const {
+    canvasSize, setFabricCanvas, setActiveObjectId,
+    syncLayersFromCanvas, pushHistory, fabricCanvas,
+  } = useEditorStore()
 
-  // Scale to fit viewport
-  const getScale = useCallback(() => {
-    if (!containerRef.current) return 1
+  const applyScale = useCallback(() => {
+    if (!containerRef.current || !wrapperRef.current) return
     const cw = containerRef.current.clientWidth - 80
     const ch = containerRef.current.clientHeight - 80
     const scaleX = cw / canvasSize.width
     const scaleY = ch / canvasSize.height
-    return Math.min(scaleX, scaleY, 1)
-  }, [canvasSize])
-
-  const applyScale = useCallback(() => {
-    if (!wrapperRef.current) return
-    const scale = getScale()
+    const scale = Math.min(scaleX, scaleY, 1)
     wrapperRef.current.style.transform = `scale(${scale})`
-  }, [getScale])
+  }, [canvasSize])
 
   useEffect(() => {
     if (!canvasEl.current) return
@@ -38,9 +35,10 @@ export function CanvasBoard() {
     })
 
     setFabricCanvas(canvas)
-    applyScale()
 
-    // Snapshot helper
+    // Apply scale after mount (give DOM time to settle)
+    setTimeout(applyScale, 50)
+
     const snapshot = () => {
       if ((canvas as any)._isRestoring) return
       pushHistory({
@@ -65,19 +63,25 @@ export function CanvasBoard() {
     })
     canvas.on('selection:cleared', () => setActiveObjectId(null))
 
-    // Initial snapshot
     pushHistory({ json: JSON.stringify(canvas.toJSON()), background: '#ffffff' })
 
-    const handleResize = () => applyScale()
-    window.addEventListener('resize', handleResize)
+    // ResizeObserver to keep scale in sync
+    const ro = new ResizeObserver(() => applyScale())
+    if (containerRef.current) ro.observe(containerRef.current)
+    window.addEventListener('resize', applyScale)
 
     return () => {
-      window.removeEventListener('resize', handleResize)
+      ro.disconnect()
+      window.removeEventListener('resize', applyScale)
       canvas.dispose()
     }
   }, [canvasSize])
 
-  // Drag & drop images
+  // Re-apply scale when canvasSize changes
+  useEffect(() => {
+    setTimeout(applyScale, 50)
+  }, [canvasSize, applyScale])
+
   const handleDrop = async (e: React.DragEvent) => {
     e.preventDefault()
     const file = e.dataTransfer.files[0]
@@ -95,7 +99,7 @@ export function CanvasBoard() {
     <div
       ref={containerRef}
       className="flex-1 flex items-center justify-center overflow-hidden relative"
-      style={{ background: 'var(--color-base-950)' }}
+      style={{ background: 'var(--color-base-950)', flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', position: 'relative' }}
       onDrop={handleDrop}
       onDragOver={handleDragOver}
     >
@@ -112,6 +116,7 @@ export function CanvasBoard() {
           boxShadow: 'var(--shadow-canvas)',
           borderRadius: 2,
           lineHeight: 0,
+          flexShrink: 0,
         }}
       >
         <canvas ref={canvasEl} />
