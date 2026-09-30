@@ -133,7 +133,7 @@ function SortableLayer({ layer, isActive }: { layer: LayerItem; isActive: boolea
 
 export function LayersPanel() {
   const canvas = useFabricCanvas()
-  const { layers, setLayers, activeObjectId, syncLayersFromCanvas } = useEditorStore()
+  const { layers, setLayers, activeObjectId, snapshot } = useEditorStore()
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }))
 
   const handleDragEnd = (event: DragEndEvent) => {
@@ -144,12 +144,11 @@ export function LayersPanel() {
     const newLayers = arrayMove(layers, oldIndex, newIndex)
     setLayers(newLayers)
     // Reorder Fabric canvas objects
-    const objs = canvas.getObjects()
-    const totalObjs = objs.length
     newLayers.slice().reverse().forEach((layer, idx) => {
       canvas.moveObjectTo(layer.fabricObject, idx)
     })
     canvas.requestRenderAll()
+    snapshot()
   }
 
   return (

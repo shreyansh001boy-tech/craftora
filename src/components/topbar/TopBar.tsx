@@ -139,7 +139,7 @@ export function TopBar() {
 
         <div style={{ width: 1, height: 20, background: 'var(--color-base-600)', margin: '0 2px' }} />
 
-        <Tooltip content="Export as PNG or JPEG" side="bottom">
+        <Tooltip content="Export as PNG, JPEG or SVG" side="bottom">
           <motion.button whileTap={{ scale: 0.96 }} onClick={() => setShowExport(true)}
             aria-label="Export design"
             style={{ display: 'flex', alignItems: 'center', gap: 6,

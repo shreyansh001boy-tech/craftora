@@ -3,6 +3,8 @@ import { ActiveSelection } from 'fabric'
 import { useEditorStore } from '@/store/editorStore'
 import { useFabricCanvas } from '@/hooks/useFabricCanvas'
 import { duplicateActiveObject, addRect, addCircle, addIText, enablePencil, disablePencil } from '@/lib/shapes'
+import { copyActive, cutActive, pasteClipboard, moveZOrder } from '@/lib/clipboard'
+import { copyStyle, pasteStyle } from '@/lib/style'
 
 export function useKeyboardShortcuts() {
   const canvas = useFabricCanvas()
@@ -32,6 +34,54 @@ export function useKeyboardShortcuts() {
     duplicateActiveObject(canvas)
   })
 
+  // Copy / cut / paste
+  useHotkeys('ctrl+c, meta+c', (e) => {
+    if (e.altKey) return
+    e.preventDefault()
+    if (canvas) void copyActive(canvas)
+  }, { enableOnFormTags: false })
+  useHotkeys('ctrl+x, meta+x', (e) => {
+    e.preventDefault()
+    if (canvas) void cutActive(canvas)
+  }, { enableOnFormTags: false })
+  useHotkeys('ctrl+v, meta+v', (e) => {
+    if (e.altKey) return
+    e.preventDefault()
+    if (canvas) void pasteClipboard(canvas)
+  }, { enableOnFormTags: false })
+
+  // Copy / paste style
+  useHotkeys('ctrl+alt+c, meta+alt+c', (e) => {
+    e.preventDefault()
+    const active = canvas?.getActiveObject()
+    if (active) copyStyle(active)
+  }, { enableOnFormTags: false })
+  useHotkeys('ctrl+alt+v, meta+alt+v', (e) => {
+    e.preventDefault()
+    const active = canvas?.getActiveObject()
+    if (!canvas || !pasteStyle(active)) return
+    canvas.requestRenderAll()
+    useEditorStore.getState().snapshotSoon()
+  }, { enableOnFormTags: false })
+
+  // Layer order
+  useHotkeys('ctrl+], meta+]', (e) => {
+    e.preventDefault()
+    if (canvas) moveZOrder(canvas, 'forward')
+  }, { enableOnFormTags: false })
+  useHotkeys('ctrl+[, meta+[', (e) => {
+    e.preventDefault()
+    if (canvas) moveZOrder(canvas, 'backward')
+  }, { enableOnFormTags: false })
+  useHotkeys('ctrl+shift+], meta+shift+]', (e) => {
+    e.preventDefault()
+    if (canvas) moveZOrder(canvas, 'front')
+  }, { enableOnFormTags: false })
+  useHotkeys('ctrl+shift+[, meta+shift+[', (e) => {
+    e.preventDefault()
+    if (canvas) moveZOrder(canvas, 'back')
+  }, { enableOnFormTags: false })
+
   // Select all
   useHotkeys('ctrl+a, meta+a', (e) => {
     e.preventDefault()
@@ -50,6 +100,12 @@ export function useKeyboardShortcuts() {
     canvas?.requestRenderAll()
   })
 
+  // Grid overlay
+  useHotkeys("ctrl+', meta+'", (e) => {
+    e.preventDefault()
+    useEditorStore.getState().toggleGrid()
+  }, { enableOnFormTags: false })
+
   // Tool shortcuts
   useHotkeys('v', () => { setActiveTool('select'); if (canvas) canvas.isDrawingMode = false })
   useHotkeys('r', () => { if (canvas) { addRect(canvas); setActiveTool('select') } })
@@ -57,63 +113,21 @@ export function useKeyboardShortcuts() {
   useHotkeys('t', () => { if (canvas) { addIText(canvas); setActiveTool('select') } })
   useHotkeys('p', () => { if (canvas) { enablePencil(canvas); setActiveTool('pencil') } })
 
-  // Arrow nudge — 1px
-  useHotkeys('up', (e) => {
-    e.preventDefault()
+  // Arrow nudge — 1px, or 10px with Shift. Nudges are recorded so undo steps
+  // through them instead of jumping back to before the whole sequence.
+  const nudge = (dx: number, dy: number) => {
     const obj = canvas?.getActiveObject()
-    if (!obj) return
-    obj.set({ top: (obj.top || 0) - 1 })
-    canvas?.requestRenderAll()
-  }, { enableOnFormTags: false })
-  useHotkeys('down', (e) => {
-    e.preventDefault()
-    const obj = canvas?.getActiveObject()
-    if (!obj) return
-    obj.set({ top: (obj.top || 0) + 1 })
-    canvas?.requestRenderAll()
-  }, { enableOnFormTags: false })
-  useHotkeys('left', (e) => {
-    e.preventDefault()
-    const obj = canvas?.getActiveObject()
-    if (!obj) return
-    obj.set({ left: (obj.left || 0) - 1 })
-    canvas?.requestRenderAll()
-  }, { enableOnFormTags: false })
-  useHotkeys('right', (e) => {
-    e.preventDefault()
-    const obj = canvas?.getActiveObject()
-    if (!obj) return
-    obj.set({ left: (obj.left || 0) + 1 })
-    canvas?.requestRenderAll()
-  }, { enableOnFormTags: false })
-
-  // Shift+Arrow — 10px nudge
-  useHotkeys('shift+up', (e) => {
-    e.preventDefault()
-    const obj = canvas?.getActiveObject()
-    if (!obj) return
-    obj.set({ top: (obj.top || 0) - 10 })
-    canvas?.requestRenderAll()
-  }, { enableOnFormTags: false })
-  useHotkeys('shift+down', (e) => {
-    e.preventDefault()
-    const obj = canvas?.getActiveObject()
-    if (!obj) return
-    obj.set({ top: (obj.top || 0) + 10 })
-    canvas?.requestRenderAll()
-  }, { enableOnFormTags: false })
-  useHotkeys('shift+left', (e) => {
-    e.preventDefault()
-    const obj = canvas?.getActiveObject()
-    if (!obj) return
-    obj.set({ left: (obj.left || 0) - 10 })
-    canvas?.requestRenderAll()
-  }, { enableOnFormTags: false })
-  useHotkeys('shift+right', (e) => {
-    e.preventDefault()
-    const obj = canvas?.getActiveObject()
-    if (!obj) return
-    obj.set({ left: (obj.left || 0) + 10 })
-    canvas?.requestRenderAll()
-  }, { enableOnFormTags: false })
+    if (!obj || !canvas) return
+    obj.set({ left: (obj.left || 0) + dx, top: (obj.top || 0) + dy })
+    canvas.requestRenderAll()
+    useEditorStore.getState().snapshotSoon()
+  }
+  useHotkeys('up', (e) => { e.preventDefault(); nudge(0, -1) }, { enableOnFormTags: false })
+  useHotkeys('down', (e) => { e.preventDefault(); nudge(0, 1) }, { enableOnFormTags: false })
+  useHotkeys('left', (e) => { e.preventDefault(); nudge(-1, 0) }, { enableOnFormTags: false })
+  useHotkeys('right', (e) => { e.preventDefault(); nudge(1, 0) }, { enableOnFormTags: false })
+  useHotkeys('shift+up', (e) => { e.preventDefault(); nudge(0, -10) }, { enableOnFormTags: false })
+  useHotkeys('shift+down', (e) => { e.preventDefault(); nudge(0, 10) }, { enableOnFormTags: false })
+  useHotkeys('shift+left', (e) => { e.preventDefault(); nudge(-10, 0) }, { enableOnFormTags: false })
+  useHotkeys('shift+right', (e) => { e.preventDefault(); nudge(10, 0) }, { enableOnFormTags: false })
 }

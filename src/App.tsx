@@ -5,11 +5,17 @@ import { CanvasBoard } from '@/components/canvas/CanvasBoard'
 import { RightPanel } from '@/components/panels/RightPanel'
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts'
 import { useEditorStore } from '@/store/editorStore'
-import { ZoomIn, ZoomOut, Maximize2 } from 'lucide-react'
+import { ZoomIn, ZoomOut, Maximize2, Grid3x3 } from 'lucide-react'
 
 function StatusBar() {
-  const { canvasSize, fabricCanvas } = useEditorStore()
-  const [zoom, setZoom] = useState(100)
+  const canvasSize = useEditorStore((s) => s.canvasSize)
+  const fabricCanvas = useEditorStore((s) => s.fabricCanvas)
+  const viewZoom = useEditorStore((s) => s.viewZoom)
+  const fitScale = useEditorStore((s) => s.fitScale)
+  const setViewZoom = useEditorStore((s) => s.setViewZoom)
+  const resetView = useEditorStore((s) => s.resetView)
+  const showGrid = useEditorStore((s) => s.showGrid)
+  const toggleGrid = useEditorStore((s) => s.toggleGrid)
   const [cursorPos, setCursorPos] = useState({ x: 0, y: 0 })
 
   // Track cursor on canvas
@@ -23,13 +29,7 @@ function StatusBar() {
     return () => { fabricCanvas.off('mouse:move', handler) }
   }, [fabricCanvas])
 
-  const applyZoom = (newZoom: number) => {
-    const clamped = Math.max(10, Math.min(300, newZoom))
-    setZoom(clamped)
-    // Scale canvas wrapper via CSS on the CanvasBoard wrapper
-    const wrapper = document.querySelector('[data-canvas-wrapper]') as HTMLElement
-    if (wrapper) wrapper.style.transform = `scale(${clamped / 100})`
-  }
+  const effectiveZoom = Math.round(fitScale * viewZoom * 100)
 
   return (
     <div style={{
@@ -54,18 +54,23 @@ function StatusBar() {
 
       {/* Zoom controls */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginLeft: 'auto' }}>
-        <button onClick={() => applyZoom(zoom - 10)} aria-label="Zoom out"
+        <button onClick={() => setViewZoom(viewZoom / 1.2)} aria-label="Zoom out"
           style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-base-500)', padding: 2, display: 'flex' }}>
           <ZoomOut size={12} />
         </button>
-        <span style={{ minWidth: 36, textAlign: 'center' }}>{zoom}%</span>
-        <button onClick={() => applyZoom(zoom + 10)} aria-label="Zoom in"
+        <span style={{ minWidth: 36, textAlign: 'center' }}>{effectiveZoom}%</span>
+        <button onClick={() => setViewZoom(viewZoom * 1.2)} aria-label="Zoom in"
           style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-base-500)', padding: 2, display: 'flex' }}>
           <ZoomIn size={12} />
         </button>
-        <button onClick={() => applyZoom(100)} aria-label="Reset zoom" title="Reset zoom"
+        <button onClick={resetView} aria-label="Fit to screen" title="Fit to screen"
           style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-base-500)', padding: 2, display: 'flex' }}>
           <Maximize2 size={11} />
+        </button>
+        <button onClick={toggleGrid} aria-label="Toggle grid" title="Toggle grid (Ctrl + ')"
+          style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2, display: 'flex',
+            color: showGrid ? 'var(--color-accent-400)' : 'var(--color-base-500)' }}>
+          <Grid3x3 size={12} />
         </button>
       </div>
 

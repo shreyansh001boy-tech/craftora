@@ -5,13 +5,14 @@ import { useProjects, saveProject, deleteProject } from '@/hooks/useProjects'
 import { useFabricCanvas } from '@/hooks/useFabricCanvas'
 import { useEditorStore } from '@/store/editorStore'
 import { nanoid } from 'nanoid'
+import { captureThumbnail } from '@/lib/export'
 import type { Project } from '@/types'
 import { staggerContainerVariants, staggerItemVariants } from '@/lib/motion'
 
 export function ProjectsPanel() {
   const canvas = useFabricCanvas()
   const projects = useProjects()
-  const { canvasSize, currentProjectName, setCurrentProjectName, setCurrentProjectId, currentProjectId } = useEditorStore()
+  const { canvasSize, setCanvasSize, currentProjectName, setCurrentProjectName, setCurrentProjectId, currentProjectId } = useEditorStore()
   const [saving, setSaving] = useState(false)
   const [confirmLoad, setConfirmLoad] = useState<Project | null>(null)
   const [nameInput, setNameInput] = useState('')
@@ -22,7 +23,7 @@ export function ProjectsPanel() {
     setSaving(true)
     const name = nameInput.trim() || currentProjectName || `Design ${new Date().toLocaleDateString()}`
     const json = JSON.stringify(canvas.toJSON())
-    const thumbnail = canvas.toDataURL({ format: 'jpeg', quality: 0.4, multiplier: 0.15 })
+    const thumbnail = captureThumbnail(canvas)
     const project: Project = {
       id: currentProjectId || nanoid(),
       name,
@@ -44,9 +45,11 @@ export function ProjectsPanel() {
     await canvas.loadFromJSON(JSON.parse(project.json))
     canvas.requestRenderAll()
     ;(canvas as any)._isRestoring = false
+    setCanvasSize(project.canvasSize)
     setCurrentProjectId(project.id)
     setCurrentProjectName(project.name)
-    useEditorStore.getState().syncLayersFromCanvas()
+    useEditorStore.getState().snapshot()
+    useEditorStore.getState().bumpBgNonce()
     setConfirmLoad(null)
   }
 

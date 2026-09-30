@@ -55,7 +55,7 @@ export interface HistoryState {
 export interface EditorState {
   // Canvas
   fabricCanvas: FabricCanvas | null
-  setFabricCanvas: (canvas: FabricCanvas) => void
+  setFabricCanvas: (canvas: FabricCanvas | null) => void
 
   // Active tool
   activeTool: ToolType
@@ -78,10 +78,29 @@ export interface EditorState {
   history: HistoryState[]
   historyIndex: number
   pushHistory: (state: HistoryState) => void
+  snapshot: () => void
+  snapshotSoon: () => void
   undo: () => void
   redo: () => void
   canUndo: boolean
   canRedo: boolean
+
+  // Viewport
+  fitScale: number
+  setFitScale: (scale: number) => void
+  viewZoom: number
+  setViewZoom: (zoom: number) => void
+  viewNonce: number
+  resetView: () => void
+
+  showGrid: boolean
+  setShowGrid: (show: boolean) => void
+  toggleGrid: () => void
+
+  // Bumped whenever something other than the Properties panel replaces the
+  // canvas background, so the panel can re-read it instead of going stale.
+  bgNonce: number
+  bumpBgNonce: () => void
 
   // Current project
   currentProjectId: string | null

@@ -61,8 +61,6 @@ export function StickerPanel() {
   const [activeCategory, setActiveCategory] = useState(0)
   const [search, setSearch] = useState('')
 
-  // emoji-mart lazy load removed — using native emoji grid instead
-
   const handleEmoji = (emoji: string) => {
     if (!canvas) return
     addEmoji(emoji, canvas)

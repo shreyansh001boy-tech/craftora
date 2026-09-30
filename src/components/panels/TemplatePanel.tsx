@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { HexColorPicker } from 'react-colorful'
 import { useFabricCanvas } from '@/hooks/useFabricCanvas'
+import { useEditorStore } from '@/store/editorStore'
+import { buildGradient } from '@/lib/appearance'
 import { motion } from 'framer-motion'
 import { staggerContainerVariants, staggerItemVariants } from '@/lib/motion'
 
@@ -11,10 +13,19 @@ const PRESET_COLORS = [
 ]
 
 // Templates metadata
-const TEMPLATES = [
+interface Template {
+  id: string
+  name: string
+  category: string
+  bg: string
+  accent: string
+  gradient?: { angle: number; from: string; to: string }
+}
+
+const TEMPLATES: Template[] = [
   { id: 'minimal-white', name: 'Minimal White', category: 'Social Post', bg: '#ffffff', accent: '#111111' },
   { id: 'dark-studio', name: 'Dark Studio', category: 'Social Post', bg: '#09090B', accent: '#F43F5E' },
-  { id: 'gradient-purple', name: 'Purple Gradient', category: 'Social Post', bg: 'linear-gradient(135deg,#7C3AED,#DB2777)', accent: '#ffffff' },
+  { id: 'gradient-purple', name: 'Purple Gradient', category: 'Social Post', bg: 'linear-gradient(135deg,#7C3AED,#DB2777)', accent: '#ffffff', gradient: { angle: 45, from: '#7C3AED', to: '#DB2777' } },
   { id: 'forest-green', name: 'Forest', category: 'Poster', bg: '#052e16', accent: '#4ade80' },
   { id: 'sunset-orange', name: 'Sunset', category: 'Poster', bg: '#7c2d12', accent: '#fb923c' },
   { id: 'ocean-blue', name: 'Ocean', category: 'Presentation', bg: '#0c4a6e', accent: '#38bdf8' },
@@ -37,15 +48,28 @@ export function TemplatePanel() {
     setBgColor(color)
     canvas.set({ backgroundColor: color })
     canvas.requestRenderAll()
+    const store = useEditorStore.getState()
+    store.snapshot()
+    store.bumpBgNonce()
   }
 
   const applyTemplate = (tpl: typeof TEMPLATES[0]) => {
     if (!canvas) return
-    // Clear canvas objects
+    const store = useEditorStore.getState()
+    // Fabric fires object:removed per shape and each one snapshots, which would
+    // bury the artwork under N undo steps. Record once, clear silently, record again.
+    store.snapshot()
+    ;(canvas as any)._isRestoring = true
     canvas.getObjects().slice().forEach((o) => canvas.remove(o))
-    const bg = tpl.bg.startsWith('linear') ? '#1a1a2e' : tpl.bg
-    canvas.set({ backgroundColor: bg })
+    ;(canvas as any)._isRestoring = false
+    canvas.set({
+      backgroundColor: tpl.gradient
+        ? buildGradient('linear', tpl.gradient, canvas.getWidth(), canvas.getHeight())
+        : tpl.bg,
+    })
     canvas.requestRenderAll()
+    store.snapshot()
+    store.bumpBgNonce()
     setConfirmTemplate(null)
   }
 
@@ -130,7 +154,7 @@ export function TemplatePanel() {
           >
             <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--color-base-100)', marginBottom: 8 }}>Apply Template?</div>
             <div style={{ fontSize: 12, color: 'var(--color-base-400)', marginBottom: 20 }}>
-              This will clear your current canvas and apply the "{confirmTemplate.name}" template. This cannot be undone.
+              This will clear your current canvas and apply the "{confirmTemplate.name}" template. Undo restores your work.
             </div>
             <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
               <button onClick={() => setConfirmTemplate(null)} className="btn-base" style={{ padding: '0 16px', height: 32, fontSize: 12 }}>Cancel</button>

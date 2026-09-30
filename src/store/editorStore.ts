@@ -5,12 +5,15 @@ import type { EditorState, LayerItem, CanvasSize, HistoryState, ToolType } from 
 import { CANVAS_PRESETS } from '@/types'
 
 const MAX_HISTORY = 50
+const MIN_ZOOM = 0.25
+const MAX_ZOOM = 4
+let snapTimer: ReturnType<typeof setTimeout> | undefined
 
 export const useEditorStore = create<EditorState>()(
   subscribeWithSelector((set, get) => ({
     // Canvas instance
     fabricCanvas: null,
-    setFabricCanvas: (canvas: FabricCanvas) => set({ fabricCanvas: canvas }),
+    setFabricCanvas: (canvas: FabricCanvas | null) => set({ fabricCanvas: canvas }),
 
     // Tool
     activeTool: 'select',
@@ -50,7 +53,6 @@ export const useEditorStore = create<EditorState>()(
     historyIndex: -1,
     canUndo: false,
     canRedo: false,
-
     pushHistory: (state: HistoryState) => {
       const { history, historyIndex } = get()
       const newHistory = history.slice(0, historyIndex + 1)
@@ -65,6 +67,23 @@ export const useEditorStore = create<EditorState>()(
       })
     },
 
+    snapshot: () => {
+      const canvas = get().fabricCanvas
+      if (!canvas || (canvas as any)._isRestoring) return
+      get().pushHistory({
+        json: JSON.stringify(canvas.toJSON()),
+        background: (canvas.backgroundColor as string) || '',
+      })
+      get().syncLayersFromCanvas()
+    },
+
+    // Slider drags and held arrow keys fire dozens of edits per second; collapse
+    // each burst into a single undo step.
+    snapshotSoon: () => {
+      clearTimeout(snapTimer)
+      snapTimer = setTimeout(() => get().snapshot(), 300)
+    },
+
     undo: () => {
       const { history, historyIndex, fabricCanvas } = get()
       if (historyIndex <= 0 || !fabricCanvas) return
@@ -76,6 +95,7 @@ export const useEditorStore = create<EditorState>()(
         fabricCanvas.requestRenderAll()
         ;(fabricCanvas as any)._isRestoring = false
         get().syncLayersFromCanvas()
+        get().bumpBgNonce()
       })
       set({ historyIndex: newIndex, canUndo: newIndex > 0, canRedo: true })
     },
@@ -91,9 +111,26 @@ export const useEditorStore = create<EditorState>()(
         fabricCanvas.requestRenderAll()
         ;(fabricCanvas as any)._isRestoring = false
         get().syncLayersFromCanvas()
+        get().bumpBgNonce()
       })
       set({ historyIndex: newIndex, canUndo: true, canRedo: newIndex < history.length - 1 })
     },
+
+    // Viewport
+    fitScale: 1,
+    setFitScale: (scale) => set({ fitScale: scale }),
+    viewZoom: 1,
+    setViewZoom: (zoom) => set({ viewZoom: Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, zoom)) }),
+    viewNonce: 0,
+    resetView: () => set({ viewZoom: 1, viewNonce: get().viewNonce + 1 }),
+
+    // Guides
+    showGrid: false,
+    setShowGrid: (show) => set({ showGrid: show }),
+    toggleGrid: () => set({ showGrid: !get().showGrid }),
+
+    bgNonce: 0,
+    bumpBgNonce: () => set({ bgNonce: get().bgNonce + 1 }),
 
     // Project
     currentProjectId: null,
