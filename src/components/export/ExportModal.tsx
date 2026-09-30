@@ -14,9 +14,11 @@ interface ExportModalProps {
 
 export function ExportModal({ onClose }: ExportModalProps) {
   const canvas = useFabricCanvas()
-  const { currentProjectName } = useEditorStore()
+  const { currentProjectName, canvasSize } = useEditorStore()
   const [format, setFormat] = useState<ExportFormat>('png')
   const [quality, setQuality] = useState(90)
+  const [scale, setScale] = useState(1)
+  const [transparent, setTransparent] = useState(false)
   const [filename, setFilename] = useState(
     currentProjectName?.replace(/[^a-z0-9]/gi, '-').toLowerCase() ||
     `craftora-design-${new Date().toISOString().split('T')[0]}`
@@ -26,9 +28,12 @@ export function ExportModal({ onClose }: ExportModalProps) {
   const handleExport = async () => {
     if (!canvas) return
     setExporting(true)
-    await exportCanvas(canvas, format, quality / 100, filename)
-    setExporting(false)
-    onClose()
+    try {
+      await exportCanvas(canvas, format, quality / 100, filename, { scale, transparent })
+      onClose()
+    } finally {
+      setExporting(false)
+    }
   }
 
   return (
@@ -77,13 +82,13 @@ export function ExportModal({ onClose }: ExportModalProps) {
             {/* Format */}
             <div>
               <div style={{ fontSize: 11, fontWeight: 500, color: 'var(--color-base-500)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>Format</div>
-              <div style={{ display: 'flex', gap: 6 }}>
-                {(['png', 'jpeg'] as ExportFormat[]).map((f) => (
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                {(['png', 'jpeg', 'svg', 'pdf', 'pptx'] as ExportFormat[]).map((f) => (
                   <button
                     key={f}
                     onClick={() => setFormat(f)}
                     style={{
-                      flex: 1, height: 36, borderRadius: 7, border: '1px solid',
+                      flex: '1 0 28%', height: 36, borderRadius: 7, border: '1px solid',
                       borderColor: format === f ? 'var(--color-accent-400)' : 'var(--color-base-600)',
                       background: format === f ? 'rgba(244,63,94,0.12)' : 'var(--color-base-800)',
                       color: format === f ? 'var(--color-accent-400)' : 'var(--color-base-400)',
@@ -96,6 +101,43 @@ export function ExportModal({ onClose }: ExportModalProps) {
                 ))}
               </div>
             </div>
+
+            {/* Resolution */}
+            {format !== 'svg' && (
+              <div>
+                <div style={{ fontSize: 11, fontWeight: 500, color: 'var(--color-base-500)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>Scale</div>
+                <div style={{ display: 'flex', gap: 6 }}>
+                  {[1, 2, 3].map((s) => (
+                    <button
+                      key={s}
+                      onClick={() => setScale(s)}
+                      style={{
+                        flex: 1, height: 32, borderRadius: 7, border: '1px solid',
+                        borderColor: scale === s ? 'var(--color-accent-400)' : 'var(--color-base-600)',
+                        background: scale === s ? 'rgba(244,63,94,0.12)' : 'var(--color-base-800)',
+                        color: scale === s ? 'var(--color-accent-400)' : 'var(--color-base-400)',
+                        fontSize: 12, fontWeight: 600, cursor: 'pointer', transition: 'all 150ms',
+                      }}
+                    >
+                      {s}x
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Transparent background */}
+            {format === 'png' && (
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 12, color: 'var(--color-base-200)' }}>
+                <input
+                  type="checkbox"
+                  checked={transparent}
+                  onChange={(e) => setTransparent(e.target.checked)}
+                  style={{ accentColor: 'var(--color-accent-400)', width: 14, height: 14 }}
+                />
+                Transparent background
+              </label>
+            )}
 
             {/* JPEG Quality */}
             {format === 'jpeg' && (
@@ -120,8 +162,14 @@ export function ExportModal({ onClose }: ExportModalProps) {
 
             {/* Info */}
             <div style={{ padding: '10px 12px', background: 'var(--color-base-800)', borderRadius: 7, border: '1px solid var(--color-base-600)' }}>
-              <div style={{ fontSize: 11, color: 'var(--color-base-500)' }}>
-                Full resolution output at canvas dimensions. No watermarks.
+              <div style={{ fontSize: 11, color: 'var(--color-base-500)', lineHeight: 1.5 }}>
+                {format === 'svg'
+                  ? `Vector output, ${canvasSize.width} × ${canvasSize.height} viewBox. Text stays live but the typeface is not embedded.`
+                  : format === 'pdf'
+                  ? `One page sized to the design, ${Math.round(canvasSize.width * 0.75)} × ${Math.round(canvasSize.height * 0.75)} pt, artwork embedded at ${Math.round(canvasSize.width * scale)} × ${Math.round(canvasSize.height * scale)} px.`
+                  : format === 'pptx'
+                  ? `One ${(canvasSize.width / 96).toFixed(2)} × ${(canvasSize.height / 96).toFixed(2)} in slide, artwork embedded as a picture at ${Math.round(canvasSize.width * scale)} × ${Math.round(canvasSize.height * scale)} px.`
+                  : `${Math.round(canvasSize.width * scale)} × ${Math.round(canvasSize.height * scale)} px${transparent ? ', transparent' : ''}. No watermarks.`}
               </div>
             </div>
           </div>

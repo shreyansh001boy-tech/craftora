@@ -17,11 +17,11 @@ export default defineConfig({
       output: {
         manualChunks(id: string) {
           if (id.includes('node_modules/fabric')) return 'vendor-fabric'
-          if (id.includes('@emoji-mart')) return 'vendor-emoji'
           if (id.includes('@dnd-kit')) return 'vendor-dnd'
           if (id.includes('framer-motion')) return 'vendor-motion'
           if (id.includes('@radix-ui')) return 'vendor-radix'
-          if (id.includes('node_modules')) return 'vendor'
+          // No catch-all here: assigning every dependency to one chunk also drags
+          // the export libraries' transitive deps into the initial bundle.
         },
       },
     },
