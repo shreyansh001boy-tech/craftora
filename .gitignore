@@ -22,3 +22,11 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# TypeScript build artifacts
+*.tsbuildinfo
+
+# This project's lockfile is package-lock.json; bun.lock is a local artifact
+# from installing with bun and must not compete with it.
+bun.lock
+bun.lockb
